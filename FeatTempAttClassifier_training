@@ -1,0 +1,124 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import matplotlib.pyplot as plt
+from sklearn.metrics import roc_auc_score
+
+# Set random seed for reproducibility
+rounds = 1
+torch.manual_seed(42 + rounds)
+
+# Define loss functions
+criterion = nn.BCELoss()  # Binary Cross Entropy for binary classification
+m = nn.Sigmoid()  # Sigmoid for output probabilities
+
+# Define training parameters
+num_epochs = 500
+input_dim = 12
+output_dim = 1  # Binary output
+learning_rate = 0.001
+padding_value = 0  # Assuming 0 is the padding value in your data
+
+# Storage for performance metrics
+FeatAtt_all = []
+TempAtt_all = []
+correct_all = []
+correct_test = []
+Perf_all = []
+Perf_all_test = []
+Loss_all = []
+
+# Training loop for each label index (in one-hot format, e.g., in case of 3 clusters we have 3 models, each explaining one cluster)
+for label_ind in range(n_cl):
+    Loss_all_i = []
+    
+    # Initialize the model
+    model = FeatTempAttClassifier(input_dim=input_dim, output_dim=output_dim)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    
+    Perf_i = []
+    Perf_i_test = []
+    correct_i = []
+    
+    # Set model to training mode
+    model.train()
+    
+    # Training loop
+    for epoch in range(num_epochs):
+        for seq, lab in train_loader:
+            # Create mask for padded tokens
+            padding_mask = (seq == padding_value)
+            class_vector = F.one_hot(lab, num_classes=3)  # One-hot encoding of labels
+            
+            # Zero the gradients
+            optimizer.zero_grad()
+
+            # Forward pass
+            outputs, att_f, att_t = model(seq.float(), lengths_seq, padding_mask[:, :, 0])
+
+            # Compute the loss for the current label
+            loss = criterion(m(outputs).squeeze(), class_vector[:, label_ind].float())
+            Loss_all_i.append(loss.item())
+            print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
+            
+            # Backward pass and optimization
+            loss.backward()
+            optimizer.step()
+
+    # Evaluation on the training set (for debugging and tracking progress)
+    out_vector = torch.zeros(len(outputs))
+    for i in range(len(outputs)):
+        if m(outputs)[i] >= 0.5:
+            out_vector[i] = 1
+
+    # Compute AUC for the training set
+    auc_train = roc_auc_score(class_vector[:, 0].detach().numpy(), m(outputs).detach().numpy())
+    Perf_i.append(auc_train)
+
+    # Compute accuracy on the training set
+    correct_count = 0
+    positive_correct = 0
+    for i in range(len(outputs)):
+        if class_vector[i, label_ind].detach().numpy() == out_vector[i].detach().numpy():
+            correct_count += 1
+            if out_vector[i].detach().numpy() == 1:
+                positive_correct += 1
+                correct_i.append(i)
+    
+    print(f'Training Accuracy: {correct_count}/{len(outputs)}')
+    Perf_i.append(correct_count)
+    Perf_i.append(positive_correct)
+    
+    # Append performance and attention weights
+    Perf_all.append(Perf_i)
+    correct_all.append(correct_i)
+    FeatAtt_all.append(att_f)
+    TempAtt_all.append(att_t)
+    Loss_all.append(Loss_all_i)
+
+    # Plot the training loss
+    plt.figure()
+    plt.plot(Loss_all_i)
+    plt.title(f'Training Loss for Label {label_ind}')
+    plt.show()
+
+    # Set model to evaluation mode
+    model.eval()
+    
+    # Evaluate on the test set
+    mask_test = (padded_test_data_tensor == padding_value)
+    outputs_test, att_test, att2_test = model(padded_test_data_tensor.float(), lengths_seq_test, mask_test[:, :, 0])
+
+    # Compute AUC for the test set
+    auc_test = roc_auc_score(y[:, 0].detach().numpy(), m(outputs_test).detach().numpy())
+    Perf_i_test.append(auc_test)
+
+    # Compute accuracy on the test set
+    predicted_labels = (m(outputs_test) > 0.5).float()
+    correct_test_count = (predicted_labels == class_vector[:, label_ind]).sum().item()
+
+    print(f'Test Accuracy: {correct_test_count}/{len(outputs_test)}')
+    Perf_i_test.append(correct_test_count)
+    
+    # Append test performance metrics
+    Perf_all_test.append(Perf_i_test)
