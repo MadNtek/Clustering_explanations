@@ -1,0 +1,33 @@
+#Feature Attention visualizations
+
+import seaborn as sns
+num_classes = 3
+n_var = 12
+n_ind = 187 
+
+fig, axes = plt.subplots(nrows=2, ncols=num_classes, figsize=(15, 5),sharey = True)
+fig2, axes2 = plt.subplots(nrows=2, ncols=num_classes, figsize=(15, 5),sharey = True)
+num_classes = 3
+xx_all = []
+
+for i in range(num_classes):
+    xx = []
+    xx1 = []
+    for ind in correct_all[i]:
+        xx.append(FeatAtt_all[i][ind].detach().numpy())
+        xx1.append(FeatAtt_all[i][ind].detach().numpy().sum(axis=0))
+    xx_all.append(xx)
+    ax = axes[0,i]
+    sns.heatmap(np.mean(np.array(xx),axis=0),ax= ax)
+    ax = axes2[0,i]
+    sns.barplot(np.arange(n_var),np.mean(np.array(xx1),axis=0),ax= ax)
+    xx = []
+    xx1 = []
+    for ind in range(n_ind):
+        if ~np.isin(ind,correct_all[i]):
+            xx.append(FeatAtt_all[i][ind].detach().numpy())
+            xx1.append(FeatAtt_all[i][ind].detach().numpy().sum(axis=0))
+    ax = axes[1,i]
+    sns.heatmap(np.mean(np.array(xx),axis=0),ax= ax)
+    ax = axes2[1,i]
+    sns.barplot(np.arange(n_var),np.mean(np.array(xx1),axis=0),ax= ax)
