@@ -1,94 +1,43 @@
-import torch
 import torch.nn as nn
-from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
-
-
-class LSTM_att1(nn.Module):
-    """
-    LSTM classifier with attention.
-
-    Assumptions:
-    - Input x has shape (batch, seq_len, input_size)
-    - Padded timesteps are filled with NaNs (commonly at the end of each sequence)
-    """
-
-    def __init__(self, input_size: int, hidden_size: int, num_layers: int, num_classes: int,
-                 lstm_dropout: float = 0.4, input_dropout: float = 0.3):
-        super().__init__()
-
+from torch.nn.utils.rnn import pack_padded_sequence
+class LSTM_att(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers, output_size):
+        super(LSTM_att, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-        self.num_classes = num_classes
+        self.dropout = nn.Dropout(0.3)
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True, dropout = 0.4)
+        self.fc = nn.Linear(hidden_size, output_size)
+        self.concat_linear = nn.Linear(self.hidden_size * 2, self.hidden_size)
 
-        self.input_dropout = nn.Dropout(input_dropout)
-        self.lstm = nn.LSTM(
-            input_size=input_size,
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            batch_first=True,
-            dropout=lstm_dropout if num_layers > 1 else 0.0,
-        )
-
-        # Attention: score each timestep -> softmax over time -> weighted sum
-        self.attn_score = nn.Linear(hidden_size, 1)
-
-        # Classifier head
-        self.fc = nn.Linear(hidden_size, num_classes)
-
-    @staticmethod
-    def _lengths_from_nan_padding(x: torch.Tensor) -> torch.Tensor:
-        """
-        Compute per-sample sequence lengths assuming padded timesteps contain NaNs.
-        Returns lengths as int64 tensor on CPU for pack_padded_sequence.
-        """
-        # valid timestep if NOT all features are NaN
-        valid = ~torch.any(torch.isnan(x), dim=-1)  # (B, T)
-        lengths = valid.sum(dim=1)                  # (B,)
-        # avoid zero-length sequences (pack doesn't like 0)
-        lengths = torch.clamp(lengths, min=1)
-        return lengths.to(dtype=torch.long, device="cpu")
-
-    def forward(self, x: torch.Tensor):
-        """
-        Returns:
-            logits_last: (B, num_classes) from last valid hidden state
-            logits_attn: (B, num_classes) from attention pooled hidden states
-        """
-        if x.dim() != 3:
-            raise ValueError(f"Expected x to have shape (batch, seq, feat), got {tuple(x.shape)}")
-
-        x = x.float()
-        x = self.input_dropout(x)
-
-        lengths = self._lengths_from_nan_padding(x)
-
-        # Replace NaNs with zeros before packing (they’ll be ignored by packing anyway)
-        x_clean = torch.nan_to_num(x, nan=0.0)
-
-        packed = pack_padded_sequence(
-            x_clean, lengths=lengths, batch_first=True, enforce_sorted=False
-        )
-
-        packed_out, _ = self.lstm(packed)
-        out, _ = pad_packed_sequence(packed_out, batch_first=True)  # (B, T_max, H)
-
-        B, T, H = out.shape
-
-        # ---- logits from last valid timestep ----
-        idx = (lengths.to(out.device) - 1).view(B, 1, 1).expand(B, 1, H)  # (B,1,H)
-        last_h = out.gather(dim=1, index=idx).squeeze(1)                  # (B,H)
-        logits_last = self.fc(last_h)                                     # (B,C)
-
-        # ---- attention pooling (mask padded timesteps) ----
-        # mask: True where valid
-        time_ids = torch.arange(T, device=out.device).unsqueeze(0)        # (1,T)
-        valid_mask = time_ids < lengths.to(out.device).unsqueeze(1)       # (B,T)
-
-        scores = self.attn_score(out).squeeze(-1)                         # (B,T)
-        scores = scores.masked_fill(~valid_mask, float("-inf"))
-        weights = torch.softmax(scores, dim=1).unsqueeze(-1)              # (B,T,1)
-
-        pooled = torch.sum(weights * out, dim=1)                          # (B,H)
-        logits_attn = self.fc(pooled)                                     # (B,C)
-
-        return logits_last, logits_attn
+        
+        self.attn = nn.Linear(self.hidden_size, hidden_size)
+        self.attn1 = nn.Linear(self.hidden_size, 1)
+    
+        
+    def forward(self, x, selected_k):
+        #x, x_lengths, _ = batch
+        #x_pack = x[~torch.any(x.isnan(),dim=1)]
+        #x_pack = pack_padded_sequence(x, x_len, batch_first=True)
+        #x = self.dropout(x_pack)
+        lstm_out = torch.zeros(x.shape[0],selected_k)
+        output = torch.zeros(x.shape[0],selected_k)
+        for i in range(x.shape[0]):
+            x_pack = x[i][~torch.any(x[i].isnan(),dim=1)]
+        
+            x2 = x_pack.to(torch.float32)
+            x2, _ = self.lstm(x2)
+        
+           
+            x3 = self.fc(x2[ -1, :])
+            print(x3.shape)
+            lstm_out[i] = x3
+            x_hidden = x2
+            x_out = x3
+            attn_weights = self.attn1(x2) # (batch_size, seq_len, hidden_dim)
+            attn_weights = torch.softmax(attn_weights, dim=1)
+            attn_out = torch.sum(attn_weights * x2, dim=1)
+            output[i] = self.fc(attn_out)
+            
+            
+        return lstm_out, output
