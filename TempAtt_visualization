@@ -1,0 +1,103 @@
+#Temporal Attention Visualizations
+#avg of all individuals
+import seaborn as sns
+num_features = 12
+num_heads = 3
+num_classes = 3
+num_clusters = 3
+corr_array = np.zeros((len(X_all70), num_heads, num_features))
+for ind in range(len(X_all70)):
+    input0 = X_all70[ind]
+    #att0 = TempAtt_all[:][ind]
+
+    for i in range(num_heads):
+        at = TempAtt_all[i][ind]
+        for f in range(num_features):
+            corr_array[ind, i, f] = np.corrcoef(input0[:,f], at[:lengths_seq[ind],:lengths_seq[ind]].mean(0).detach().numpy())[0,1]
+
+
+
+fig, axes = plt.subplots(nrows=1, ncols=num_classes, figsize=(15, 5),sharey = True)
+for i in range(num_clusters):
+    #mask_l = (predicted == i) & (labels == i)
+    #print(sum(mask_l))
+    print(corr_array[correct_all[i],i,:].shape)
+    corr_avg = np.nanmean(corr_array[correct_all[i],i,:],axis=0)
+#plt.figure(figsize=(12, 6))
+    ax = axes[i]
+    sns.barplot(x=np.arange(num_features), y=corr_avg, ax=ax)
+    #ax.set_xticklabels([df12.columns])
+    ax.set_title('Feature Correlation with Attention-Head '+ str(i))
+    ax.set_xlabel('Feature')
+    ax.set_ylabel('Correlation Coefficient')
+    
+fig, axes = plt.subplots(nrows=1, ncols=num_classes, figsize=(15, 5),sharey = True)
+for i in range(num_heads):
+    #mask_l = (predicted == i) & (labels == i)
+    #print(sum(mask_l))
+    #print(corr_array[mask_l==1,i,:].shape)
+    corr_avg = np.nanmean(np.abs(corr_array[correct_all[i],i,:]),axis=0)
+#plt.figure(figsize=(12, 6))
+    ax = axes[i]
+    sns.barplot(x=np.arange(num_features), y=corr_avg, ax=ax)
+    #ax.set_xticklabels([df12.columns])
+    ax.set_title('Absolute Feature Correlation with Attention-Head '+ str(i))
+    ax.set_xlabel('Feature')
+    ax.set_ylabel('Correlation Coefficient')
+    
+fig, axes = plt.subplots(nrows=1, ncols=num_classes, figsize=(15, 5),sharey = True)
+
+for i in range(num_classes):
+    ax = axes[i]
+    count = np.empty((1,num_classes))
+
+    for j in range(num_features):
+        feat = j
+        count_val = np.sum(corr_array[correct_all[i],i,j]>0)
+        s = 1
+        count = np.concatenate([count, np.array([count_val, s, feat])[None,:]],axis=0)
+        count_val = np.sum(corr_array[correct_all[i],i,j]<0)
+        s = -1
+        count = np.concatenate([count, np.array([count_val, s, feat])[None,:]],axis=0)
+
+    count = count[1:,:]
+    df_count = pd.DataFrame(count, columns = ["counts", "pos", "Feature"]) 
+    #df_count
+    sns.barplot(x = df_count["Feature"] , y= df_count["counts"], hue = df_count["pos"], ax = ax)
+
+    
+#context vector
+#corr to input
+
+num_heads = 3
+context_array = np.zeros((len(X_all70), X_all70[0].shape[0], X_all70[0].shape[1]))
+context_corr_array = np.zeros((len(X_all70), num_heads, num_features))
+
+for ind in range(len(X_all70)):
+    input0 = X_all70[ind]
+    #att0 = att_w[ind]
+    cont = np.zeros((num_heads,input0.shape[0],input0.shape[1]))
+    
+        
+    for i in range(num_heads):
+        #at = att0[i]
+        att00 = TempAtt_all[i][ind].mean(0).detach().numpy()
+        for f in range(num_features):
+            cont[i,:,f] = input0[:,f]*att00[:lengths_seq[ind]]
+            context_corr_array[ind, i, f] = np.corrcoef(input0[:,f], cont[i,:,f])[0,1]
+
+#avg of all ind
+import seaborn as sns
+
+fig, axes = plt.subplots(nrows=1, ncols=num_classes, figsize=(15, 5))
+for i in range(num_heads):
+    #mask_l = (predicted == i) & (labels == i)
+    c = context_corr_array[correct_all[i],i,:]
+    context_corr_avg = np.nanmean(c,axis=0)
+#plt.figure(figsize=(num_features, 6))
+    ax = axes[i]
+    sns.barplot(x=np.arange(num_features), y=context_corr_avg, ax=ax)
+    ax.set_title('Feature Correlation with Attention-Head '+ str(i))
+    ax.set_xlabel('Feature')
+    ax.set_ylabel('Correlation Coefficient')
+           
