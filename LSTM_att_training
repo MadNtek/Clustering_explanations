@@ -42,7 +42,7 @@ y_train = y_train.long().to(device)
 # Model / Loss / Optimizer
 # -----------------------------
 in_channels = x_train.shape[-1]
-model = LSTM_att1(in_channels, hidden_size, num_layers, selected_k).to(device)
+model = LSTM_att(in_channels, hidden_size, num_layers, selected_k).to(device)
 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=LR)
@@ -62,7 +62,7 @@ for epoch in range(NUM_EPOCHS):
     output = torch.zeros(XX.shape[0],selected_k)
     
     output1, output2 = model(x, selected_k)
-    loss = criterion(logits, y_train)
+    loss = criterion(output2, y_train)
 
     loss.backward()
     optimizer.step()
