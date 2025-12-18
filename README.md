@@ -1,7 +1,9 @@
 # Clustering_explanations
 Attention mechanisms for explaining time-series clustering
+https://arxiv.org/pdf/2405.04854?
 
 📌 Models Overview
+
 1️⃣ LSTM (Baseline)
 
 A standard LSTM classifier that processes variable-length time-series to predict the number of clusters where each individual belongs (clustering-independent output)
@@ -38,13 +40,21 @@ Outputs: class logits, feature attention weights, temporal attention weights
 🗂 Repository Structure
 .
 ├── models/
+
 │   ├── LSTM.py
+
 │   ├── LSTM_att.py
+
 │   ├── LSTM_att_training.py
+
 │   ├── FeatTempAttClassifier.py
+
 │   └── FeatTempAttClassifier_training.py
+
 │   └── TempAtt_vizualization.py
+
 │   └── FeatTempAtt_vizualization.py
+
 ├── requirements.txt
 └── README.md
 
