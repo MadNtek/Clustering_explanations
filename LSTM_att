@@ -1,0 +1,112 @@
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.optim as optim
+
+# -----------------------------
+# Reproducibility
+# -----------------------------
+torch.manual_seed(0)
+np.random.seed(0)
+
+# -----------------------------
+# Config
+# -----------------------------
+LR = 5e-4
+NUM_EPOCHS = 1
+HIDDEN_SIZE = 32
+NUM_LAYERS = 5
+
+# Assumed to exist in your scope:
+# - X70, X70_test (numpy arrays)
+# - y_train (class indices, shape [N], torch or numpy)
+# - selected_k, selected_cl
+# - LSTM_att1 model class
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# -----------------------------
+# Data
+# -----------------------------
+x_train = torch.from_numpy(X70).float().to(device)
+x_test = torch.from_numpy(X70_test).float().to(device)
+
+# y must be LongTensor of class indices for CrossEntropyLoss
+if isinstance(y_train, np.ndarray):
+    y_train = torch.from_numpy(y_train)
+y_train = y_train.long().to(device)
+
+# If you truly have test labels, use y_test. Otherwise remove test loss.
+y_test = y_train  # <-- replace with real y_test if available
+
+# -----------------------------
+# Model / Loss / Optimizer
+# -----------------------------
+in_channels = x_train.shape[-1]
+model = LSTM_att1(in_channels, HIDDEN_SIZE, NUM_LAYERS, selected_k).to(device)
+
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.Adam(model.parameters(), lr=LR)
+
+# -----------------------------
+# Train + Eval helpers
+# -----------------------------
+def forward_logits(model, x, k):
+    """
+    Your model returns (output1, output2) in your snippet.
+    We assume output1 are the logits of shape [N, k].
+    Adjust if your model outputs differ.
+    """
+    out1, out2 = model(x, k)
+    return out1, out2
+
+history = {"train_loss": [], "test_loss": []}
+
+for epoch in range(NUM_EPOCHS):
+    # ---- train ----
+    model.train()
+    optimizer.zero_grad()
+
+    logits, aux = forward_logits(model, x_train, selected_k)
+    loss = criterion(logits, y_train)
+
+    loss.backward()
+    optimizer.step()
+
+    history["train_loss"].append(loss.item())
+
+    # ---- eval ----
+    model.eval()
+    with torch.no_grad():
+        test_logits, _ = forward_logits(model, x_test, selected_k)
+        test_loss = criterion(test_logits, y_test).item()
+        history["test_loss"].append(test_loss)
+
+    print(
+        f"Epoch {epoch + 1}/{NUM_EPOCHS} | "
+        f"train_loss={loss.item():.4f} | test_loss={test_loss:.4f}"
+    )
+
+# -----------------------------
+# Save artifacts
+# -----------------------------
+ckpt_path = f"model_cl{selected_cl}_k{selected_k}.pth"
+torch.save(
+    {
+        "epoch": NUM_EPOCHS,
+        "model_state_dict": model.state_dict(),
+        "optimizer_state_dict": optimizer.state_dict(),
+        "config": {
+            "lr": LR,
+            "hidden_size": HIDDEN_SIZE,
+            "num_layers": NUM_LAYERS,
+            "selected_k": selected_k,
+            "selected_cl": selected_cl,
+        },
+        "history": history,
+    },
+    ckpt_path,
+)
+
+np.save(f"loss_train_cl{selected_cl}_k{selected_k}.npy", np.array(history["train_loss"]))
+np.save(f"loss_test_cl{selected_cl}_k{selected_k}.npy", np.array(history["test_loss"]))
