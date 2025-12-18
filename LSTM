@@ -3,9 +3,9 @@ import torch.nn as nn
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 
-class LModel5e(nn.Module):
+class LSTMModel(nn.Module):
     """
-    Plain LSTM classifier (no attention).
+    LSTM classifier 
 
     Assumptions:
     - Input x: (batch, seq_len, input_size)
