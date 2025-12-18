@@ -39,6 +39,7 @@ Outputs: class logits, feature attention weights, temporal attention weights
 
 🗂 Repository Structure
 .
+
 ├── models/
 
 │   ├── LSTM.py
