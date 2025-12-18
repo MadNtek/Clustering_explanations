@@ -57,6 +57,7 @@ Outputs: class logits, feature attention weights, temporal attention weights
 │   └── FeatTempAtt_vizualization.py
 
 ├── requirements.txt
+
 └── README.md
 
 📥 Input Format
